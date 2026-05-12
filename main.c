@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <termios.h>
 #include <fcntl.h>
@@ -32,10 +33,15 @@
 #define PF_HEIGHT 20
 
 
-const char *title =	"     _       _     \n"
-					" ___| |_ ___|_|___ \n"
+const char *title =	"     _       _\n"
+					" ___| |_ ___|_|___\n"
 					"|  _|  _|  _| |_ -|\n"
 					"|___|_| |_| |_|___|\n";
+
+const char *game_over = " ___ ___ _____ ___   ___ _ _ ___ ___\n"
+						"| . | .'|     | -_| | . | | | -_|  _|\n"
+						"|_  |__,|_|_|_|___| |___|\\_/|___|_|\n"
+						"|___|\n";
 
 
 void tcsetraw(struct termios *oldt) {
@@ -48,7 +54,7 @@ void tcreset(struct termios *oldt) {
 	tcsetattr(STDIN_FILENO, TCSANOW, oldt);
 }
 
-void setnonblock(int enable) {
+void setnonblock(bool enable) {
 	int fl = fcntl(STDIN_FILENO, F_GETFL, 0);
 
 	if (enable) fl |= O_NONBLOCK;
@@ -58,7 +64,7 @@ void setnonblock(int enable) {
 }
 
 
-void usleep(long ms) {
+void ssleep(long ms) {
 	struct timeval tv;
 	tv.tv_sec = ms / 1000000L;
 	tv.tv_usec = ms % 1000000L;
@@ -66,7 +72,7 @@ void usleep(long ms) {
 }
 
 
-const int TM_SHAPES[7][4][4][4] = {
+const bool TM_SHAPES[7][4][4][4] = {
 	{
 		{{0, 0, 0, 0}, {0, 1, 1, 0}, {0, 1, 1, 0}, {0, 0, 0, 0}},
 		{{0, 0, 0, 0}, {0, 1, 1, 0}, {0, 1, 1, 0}, {0, 0, 0, 0}},
@@ -117,11 +123,11 @@ typedef struct {
 	int type;
 } tm;
 
-int tm_predict(int *pf, tm *t, int nx, int ny) {
+bool tm_predict(bool *pf, tm *t, int nx, int ny, int nrot) {
 	int x, y;
 	for (y = 0; y < 4; y++) {
 		for (x = 0; x < 4; x++) {
-			if (TM_SHAPES[t->type][t->rot][x][y]) {
+			if (TM_SHAPES[t->type][nrot][x][y]) {
 				int pf_x = nx + x;
 				int pf_y = ny + y;
 
@@ -138,7 +144,7 @@ int tm_predict(int *pf, tm *t, int nx, int ny) {
 	return 0;
 }
 
-void tm_lock(int *pf, tm *t) {
+void tm_lock(bool *pf, tm *t) {
 	int x, y;
 	for (y = 0; y < 4; y++) {
 		for (x = 0; x < 4; x++) {
@@ -155,7 +161,7 @@ void tm_lock(int *pf, tm *t) {
 }
 
 
-void pf_clear(int *pf, int *score) {
+void pf_clear(bool *pf, unsigned int *score) {
 	int x, y;
 	for (y = PF_HEIGHT - 1; y >= 0; y--) {
 		int full = 1;
@@ -179,21 +185,21 @@ void pf_clear(int *pf, int *score) {
 				pf[0 * PF_WIDTH + x] = 0;
 			}
 
-			*score += 10;
+			*score += 100;
 			y++;
 		}
 	}
 }
 
-void pf_render(int *pf, tm *t, int *time, int *score) {
+void pf_render(bool *pf, tm *t, unsigned int *time, unsigned int *score) {
 	printf("\033[H\033[32m");
-	printf("%s\nTIME:\t%d\nSCORE:\t%d\n\n", title, *time, *score);
+	printf("%s\nTIME:\t%ds\nSCORE:\t%d\n\n", title, *time, *score);
 
 	int x, y;
 	for (y = 0; y < PF_HEIGHT; y++) {
 		printf("<!");
 		for (x = 0; x < PF_WIDTH; x++) {
-			int is_tm = 0;
+			bool is_tm = 0;
 			if (x >= t->x && x < t->x + 4 && y >= t->y && y < t->y + 4) {
 				is_tm = TM_SHAPES[t->type][t->rot][x - t->x][y - t->y];
 			}
@@ -210,22 +216,17 @@ void pf_render(int *pf, tm *t, int *time, int *score) {
 
 
 int main(void) {
-	int *pf = (int *)calloc(PF_WIDTH * PF_HEIGHT, sizeof(int));
+	bool *pf = (bool *)calloc(PF_WIDTH * PF_HEIGHT, sizeof(bool));
 
 	if (!pf) {
 		perror("error: calloc failed");
 		return 1;
 	}
 
-	int i;
-	for (i = 0; i < PF_WIDTH * PF_HEIGHT; i++) {
-		pf[i] = 0;
-	}
-
 	tm t;
-	int tm_falling = 0;
-	int time = 0;
-	int score = 0;
+	bool tm_falling = 0;
+	unsigned int time = 0;
+	unsigned int score = 0;
 
 	printf("\033[2J");
 
@@ -234,24 +235,25 @@ int main(void) {
 	tcsetraw(&oldt);
 	setnonblock(1);
 
-	int g_timeout = 100;
-	int g_time = 0;
+	unsigned int g_timeout = 100;
+	unsigned int g_time = 0;
+
 	char ch;
 
 	while (1) {
 		if (read(STDIN_FILENO, &ch, 1) == 1) {
 			if (ch == 'q') break;
 			if (tm_falling) {
-				if (ch == 'w' && !tm_predict(pf, &t, t.x, t.y + 1)) {
+				if (ch == 'w' && !tm_predict(pf, &t, t.x, t.y, (t.rot + 1) % 4)) {
 					t.rot = (t.rot + 1) % 4;
 				}
-				if (ch == 's' && !tm_predict(pf, &t, t.x, t.y + 1)) {
+				if (ch == 's' && !tm_predict(pf, &t, t.x, t.y + 1, t.rot)) {
 					t.y++;
 				}
-				if (ch == 'a' && !tm_predict(pf, &t, t.x - 1, t.y)) {
+				if (ch == 'a' && !tm_predict(pf, &t, t.x - 1, t.y, t.rot)) {
 					t.x--;
 				}
-				if (ch == 'd' && !tm_predict(pf, &t, t.x + 1, t.y)) {
+				if (ch == 'd' && !tm_predict(pf, &t, t.x + 1, t.y, t.rot)) {
 					t.x++;
 				}
 			}
@@ -263,14 +265,14 @@ int main(void) {
 			t.rot = 0;
 			t.type = rand() % 7;
 			tm_falling = 1;
-			if (tm_predict(pf, &t, t.x, t.y)) {
+			if (tm_predict(pf, &t, t.x, t.y, t.rot)) {
 				break;
 			};
 		}
 
 		if (g_time >= g_timeout) {
 			if (tm_falling) {
-				if (!tm_predict(pf, &t, t.x, t.y + 1)) {
+				if (!tm_predict(pf, &t, t.x, t.y + 1, t.rot)) {
 					t.y++;
 				} else {
 					tm_lock(pf, &t);
@@ -284,22 +286,23 @@ int main(void) {
 
 		pf_render(pf, &t, &time, &score);
 
-		usleep(10000);
+		ssleep(10000);
 
 		g_time++;
 	}
 
+	free(pf);
+
 	setnonblock(0);
-	tcreset(&oldt);
 
 	printf("\033[2J\033[H");
 
-	printf("GAME OVER! Press Enter to exit.");
+	printf("%s\nTIME:\t%ds\nSCORE:\t%d\n\nPress any key to exit.", game_over, time, score);
 	getchar();
 
-	printf("\033[0m");
+	tcreset(&oldt);
 
-	free(pf);
+	printf("\n\033[0m");
 
 	return 0;
 }
