@@ -236,8 +236,18 @@ void pf_render(bool *pf, tm *t, gamestat *gs) {
 		}
 		printf("!>\n");
 	}
-	printf("<!====================!>\n");
-	printf("  \\/\\/\\/\\/\\/\\/\\/\\/\\/\\/");
+
+	printf("<!");
+
+	for (x = 0; x < (PF_WIDTH * 2); x++) {
+		putchar('=');
+	}
+
+	printf("!>\n  ");
+
+	for (x = 0; x < PF_WIDTH; x++) {
+		printf("\\/");
+	}
 
 	fflush(stdout);
 }
