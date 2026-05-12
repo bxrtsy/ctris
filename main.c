@@ -136,6 +136,18 @@ typedef struct {
 	int type;
 } tm;
 
+
+typedef struct {
+	unsigned int lines;
+	unsigned int score;
+} gamestat;
+
+void gsprint(gamestat *gs) {
+	printf("\nFULL LINES:\t%d\n", gs->lines);
+	printf("SCORE:\t%d\n\n", gs->score);
+}
+
+
 bool tm_predict(bool *pf, tm *t, int nx, int ny, int nrot) {
 	int x, y;
 	for (y = 0; y < 4; y++) {
@@ -174,7 +186,7 @@ void tm_lock(bool *pf, tm *t) {
 }
 
 
-void pf_clear(bool *pf, unsigned int *score) {
+void pf_clear(bool *pf, gamestat *gs) {
 	int x, y;
 	for (y = PF_HEIGHT - 1; y >= 0; y--) {
 		int full = 1;
@@ -198,15 +210,18 @@ void pf_clear(bool *pf, unsigned int *score) {
 				pf[0 * PF_WIDTH + x] = 0;
 			}
 
-			*score += 100;
-			y++;
+			gs->score += 10;
+			gs->lines++; y++;
 		}
 	}
 }
 
-void pf_render(bool *pf, tm *t, unsigned int *time, unsigned int *score) {
+
+void pf_render(bool *pf, tm *t, gamestat *gs) {
 	printf("\033[H\033[32m");
-	printf("%s\nTIME:\t%ds\nSCORE:\t%d\n\n", title, *time, *score);
+
+	printf(title);
+	gsprint(gs);
 
 	int x, y;
 	for (y = 0; y < PF_HEIGHT; y++) {
@@ -245,10 +260,8 @@ int main(int argc, char **argv) {
 
 	tm t;
 	bool tm_falling = 0;
-	unsigned int time = 0;
-	unsigned int score = 0;
 
-	bool pause = 0;
+	gamestat gs = {0, 0};
 
 	printf("\033[2J");
 
@@ -260,13 +273,15 @@ int main(int argc, char **argv) {
 	unsigned int g_timeout = 100;
 	unsigned int g_time = 0;
 
+	bool pause = 0;
+
 	char ch;
 
 	while (1) {
 		if (read(STDIN_FILENO, &ch, 1) == 1) {
 			if (ch == 'q') break;
-			if (ch == 'p') pause = !pause;
-			if (tm_falling && !pause) {
+				if (ch == 'p') pause = !pause;
+				if (tm_falling && !pause) {
 				if (ch == 'w' && !tm_predict(pf, &t, t.x, t.y, (t.rot + 1) % 4)) {
 					t.rot = (t.rot + 1) % 4;
 				}
@@ -284,36 +299,36 @@ int main(int argc, char **argv) {
 
 		if (!pause) {
 
-		if (!tm_falling) {
-			t.x = PF_WIDTH / 2 - 2;
-			t.y = 0;
-			t.rot = 0;
-			t.type = rand() % 7;
-			tm_falling = 1;
-			if (tm_predict(pf, &t, t.x, t.y, t.rot)) {
-				break;
-			};
-		}
-
-		if (g_time >= g_timeout) {
-			if (tm_falling) {
-				if (!tm_predict(pf, &t, t.x, t.y + 1, t.rot)) {
-					t.y++;
-				} else {
-					tm_lock(pf, &t);
-					pf_clear(pf, &score);
-					tm_falling = 0;
-				}
+			if (!tm_falling) {
+				t.x = PF_WIDTH / 2 - 2;
+				t.y = 0;
+				t.rot = 0;
+				t.type = rand() % 7;
+				tm_falling = 1;
+				if (tm_predict(pf, &t, t.x, t.y, t.rot)) {
+					break;
+				};
 			}
-			g_time = 0;
-			time++;
-		}
 
-		pf_render(pf, &t, &time, &score);
+			if (g_time >= g_timeout) {
+				if (tm_falling) {
+					if (!tm_predict(pf, &t, t.x, t.y + 1, t.rot)) {
+						t.y++;
+					} else {
+						tm_lock(pf, &t);
+						gs.score++;
+						pf_clear(pf, &gs);
+						tm_falling = 0;
+					}
+				}
+				g_time = 0;
+			}
 
-		ssleep(10000);
+			pf_render(pf, &t, &gs);
 
-		g_time++;
+			ssleep(10000);
+
+			g_time++;
 
 		}
 		else {
@@ -327,7 +342,10 @@ int main(int argc, char **argv) {
 
 	printf("\033[2J\033[H");
 
-	printf("%s\nTIME:\t%ds\nSCORE:\t%d\n\nPress any key to exit.", game_over, time, score);
+	printf(game_over);
+	gsprint(&gs);
+
+	printf("Press any key to exit.");
 	getchar();
 
 	tcreset(&oldt);
