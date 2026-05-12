@@ -7,4 +7,4 @@ all:
 	$(CC) $(CFLAGS) main.c -o $(TARGET)
 
 clean:
-	rm $(TARGET)
+	rm -f $(TARGET)
