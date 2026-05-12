@@ -77,10 +77,10 @@ void setnonblock(bool enable) {
 }
 
 
-void ssleep(long ms) {
+void ssleep(long microsec) {
 	struct timeval tv;
-	tv.tv_sec = ms / 1000000L;
-	tv.tv_usec = ms % 1000000L;
+	tv.tv_sec = microsec / 1000000L;
+	tv.tv_usec = microsec % 1000000L;
 	select(0, NULL, NULL, NULL, &tv);
 }
 
