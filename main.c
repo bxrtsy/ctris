@@ -144,7 +144,7 @@ typedef struct {
 
 void gsprint(gamestat *gs) {
 	printf("\nFULL LINES:\t%d\n", gs->lines);
-	printf("SCORE:\t%d\n\n", gs->score);
+	printf("SCORE:\t\t%d\n\n", gs->score);
 }
 
 
@@ -298,7 +298,6 @@ int main(int argc, char **argv) {
 		}
 
 		if (!pause) {
-
 			if (!tm_falling) {
 				t.x = PF_WIDTH / 2 - 2;
 				t.y = 0;
