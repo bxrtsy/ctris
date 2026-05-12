@@ -38,7 +38,20 @@ const char *title =	"     _       _\n"
 					"|  _|  _|  _| |_ -|\n"
 					"|___|_| |_| |_|___|\n";
 
-const char *game_over = " ___ ___ _____ ___   ___ _ _ ___ ___\n"
+const char *copyright =
+"ctris is a puzzle video game about falling tetrominoes in a rectangular\n"
+"playfield stacking into lines, written in ansi c.\n\n"
+"copyright (c) 2026 baiar tsy <124367691+bxrtsy@users.noreply.github.com>\n";
+
+const char *help =	" KEY\tDESCRIPTION\n"
+					" q\texit\n"
+					" p\tpause\n"
+					" w\trotate tetromino\n"
+					" a\tmove tetromino left\n"
+					" s\tmove tetromino right\n"
+					" d\tmove tetromino down\n";
+
+const char *game_over =	" ___ ___ _____ ___   ___ _ _ ___ ___\n"
 						"| . | .'|     | -_| | . | | | -_|  _|\n"
 						"|_  |__,|_|_|_|___| |___|\\_/|___|_|\n"
 						"|___|\n";
@@ -215,7 +228,14 @@ void pf_render(bool *pf, tm *t, unsigned int *time, unsigned int *score) {
 }
 
 
-int main(void) {
+int main(int argc, char **argv) {
+	if (argc == 2) {
+		if (argv[1][0] == 'h') {
+			printf("%s\n%s\n", copyright, help);
+			return 0;
+		}
+	}
+
 	bool *pf = (bool *)calloc(PF_WIDTH * PF_HEIGHT, sizeof(bool));
 
 	if (!pf) {
@@ -227,6 +247,8 @@ int main(void) {
 	bool tm_falling = 0;
 	unsigned int time = 0;
 	unsigned int score = 0;
+
+	bool pause = 0;
 
 	printf("\033[2J");
 
@@ -243,7 +265,8 @@ int main(void) {
 	while (1) {
 		if (read(STDIN_FILENO, &ch, 1) == 1) {
 			if (ch == 'q') break;
-			if (tm_falling) {
+			if (ch == 'p') pause = !pause;
+			if (tm_falling && !pause) {
 				if (ch == 'w' && !tm_predict(pf, &t, t.x, t.y, (t.rot + 1) % 4)) {
 					t.rot = (t.rot + 1) % 4;
 				}
@@ -258,6 +281,8 @@ int main(void) {
 				}
 			}
 		}
+
+		if (!pause) {
 
 		if (!tm_falling) {
 			t.x = PF_WIDTH / 2 - 2;
@@ -289,6 +314,11 @@ int main(void) {
 		ssleep(10000);
 
 		g_time++;
+
+		}
+		else {
+			ssleep(1000000);
+		}
 	}
 
 	free(pf);
