@@ -259,7 +259,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	bool *pf = (bool *)calloc(PF_WIDTH * PF_HEIGHT, sizeof(bool));
+	bool *pf = calloc(PF_WIDTH * PF_HEIGHT, sizeof(bool));
 
 	if (!pf) {
 		perror("error: calloc failed");
